@@ -2,10 +2,7 @@
 
 > 🎶 **本地音乐管理播放器 —— 管理、播放、转换，一站搞定** 🎶
 
-![Python](https://img.shields.io/badge/Python-3.10+-EE82EE?logo=python&logoColor=white)
-![SQLite](https://img.shields.io/badge/SQLite-3-7B68EE?logo=sqlite&logoColor=white)
-![pygame](https://img.shields.io/badge/pygame-2-FF69B4?logo=pygame&logoColor=white)
-![License](https://img.shields.io/badge/License-MIT-98FB98)
+🐍 Python 3.10+ &nbsp;|&nbsp; 🗄️ SQLite 3 &nbsp;|&nbsp; 🎵 pygame 2 &nbsp;|&nbsp; 📄 MIT License
 
 ---
 
