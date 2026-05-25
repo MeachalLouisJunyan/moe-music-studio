@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Moe Music Studio — main entry point."""
+"""Jy Music — main entry point."""
 
 from gui import main
 

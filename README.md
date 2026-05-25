@@ -1,6 +1,6 @@
-# 🎵 Moe Music Studio
+# 🎵 Jy Music
 
-**萌系音乐管理播放器** — 一款 Python 桌面应用，集音乐库管理、播放与格式转换于一体。
+**音乐管理播放器** — 一款 Python 桌面应用，集音乐库管理、播放与格式转换于一体。
 
 ![Python](https://img.shields.io/badge/Python-3.10+-blue)
 ![License](https://img.shields.io/badge/License-MIT-green)

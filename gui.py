@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Moe Music Studio — GUI
+Jy Music — GUI
 Music library manager + player + converter — all in one.
 """
 
@@ -71,10 +71,10 @@ THEMES = {
 # App
 # ═══════════════════════════════════════════════════════════════
 
-class MoeMusicStudio:
+class JyMusic:
     def __init__(self, root):
         self.root = root
-        self.root.title("Moe Music Studio")
+        self.root.title("Jy Music")
         self.root.geometry("1024x640")
         self.root.minsize(800, 500)
 
@@ -730,7 +730,7 @@ def main():
     except ImportError:
         root = tk.Tk()
 
-    MoeMusicStudio(root)
+    JyMusic(root)
     root.mainloop()
 
 
