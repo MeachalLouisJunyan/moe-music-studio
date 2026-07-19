@@ -4,6 +4,7 @@ Jy Music — GUI
 Music library manager + player + converter — all in one.
 """
 
+import json
 import os
 import subprocess
 import sys
@@ -42,6 +43,24 @@ def user_data_dir():
     d = base / "JyMusic"
     d.mkdir(parents=True, exist_ok=True)
     return d
+
+
+def load_settings():
+    try:
+        with open(user_data_dir() / "settings.json", encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+def save_settings(**kw):
+    s = load_settings()
+    s.update(kw)
+    try:
+        with open(user_data_dir() / "settings.json", "w", encoding="utf-8") as f:
+            json.dump(s, f, ensure_ascii=False, indent=2)
+    except OSError:
+        pass
 
 # ═══════════════════════════════════════════════════════════════
 # Themes
@@ -106,7 +125,7 @@ class JyMusic:
 
         self.db = MusicDB(str(user_data_dir() / "music.db"))
         self.player = get_player()
-        self.theme = THEMES["anime"]
+        self.theme = THEMES.get(load_settings().get("theme"), THEMES["anime"])
         self.current_playlist = None  # playlist id for queue
         self.play_queue = []          # list of song ids in order
         self.queue_index = -1
@@ -883,6 +902,7 @@ class JyMusic:
 
     def _set_theme(self, name):
         self.theme = THEMES[name]
+        save_settings(theme=name)
         self.root.configure(bg=self.theme["bg"])
         messagebox.showinfo("主题", f"已切换到 {name} 主题\n重启后全局生效")
 

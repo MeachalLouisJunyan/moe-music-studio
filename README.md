@@ -100,7 +100,9 @@ python main.py
 
 ## 📸 截图
 
-> 🖼️ 截图酱正在赶来的路上……
+| 🌸 萌系粉 | 🌙 暗黑系 | ☁️ 清新白 |
+|:---:|:---:|:---:|
+| ![anime](screenshots/theme-anime.png) | ![dark](screenshots/theme-dark.png) | ![light](screenshots/theme-light.png) |
 
 ---
 
@@ -117,7 +119,9 @@ python main.py
 这是让开发继续下去的最大动力！(๑´ㅂ`๑)
 
 - ⭐ 给仓库点个 Star
-- ☕ 应用内「帮助 → 支持作者」，或通过仓库页的 Sponsor 按钮打赏
+- 💖 [爱发电](https://ifdian.net/a/LOUISMEACHALJUNYAN) — 请作者喝杯奶茶
+- 💜 [GitHub Sponsors](https://github.com/sponsors/MeachalLouisJunyan) — 持续支持
+- ☕ 应用内「帮助 → 支持作者」也可以直达
 
 ---
 
