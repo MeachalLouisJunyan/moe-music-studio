@@ -704,27 +704,46 @@ class JyMusic:
 
         dlg = tk.Toplevel(self.root)
         dlg.title("扫描中...")
-        dlg.geometry("360x100")
+        dlg.geometry("360x130")
         dlg.configure(bg=self.theme["card"])
         dlg.transient(self.root)
 
-        status_label = tk.Label(dlg, text="正在扫描...",
+        status_label = tk.Label(dlg, text="正在查找音频文件...",
                                 bg=self.theme["card"],
                                 fg=self.theme["text"],
                                 font=("Microsoft YaHei UI", 10))
-        status_label.pack(pady=(20, 8))
+        status_label.pack(pady=(16, 6))
 
         prog = ttk.Progressbar(dlg, mode="determinate", length=300)
-        prog.pack(pady=(0, 16))
+        prog.pack(pady=(0, 10))
+
+        cancelled = threading.Event()
+
+        cancel_btn = tk.Button(dlg, text="取消", bg=self.theme["accent"],
+                               fg="white", borderwidth=0, padx=16, pady=2,
+                               font=("Microsoft YaHei UI", 9),
+                               command=cancelled.set)
+        cancel_btn.pack()
+
+        dlg.protocol("WM_DELETE_WINDOW", cancelled.set)
 
         def _scan():
             files = quick_scan(folder)
             total = len(files)
-            prog.config(maximum=total)
+            if total == 0:
+                self.root.after(0, lambda: (
+                    dlg.destroy(),
+                    messagebox.showinfo("扫描", "未发现音频文件")))
+                return
+            self.root.after(0, lambda: prog.config(maximum=total))
+            added = 0
 
             for i, fp in enumerate(files):
+                if cancelled.is_set():
+                    break
                 meta = probe_file(fp)
-                self.db.add_song(
+                meta.setdefault("file_path", str(Path(fp).resolve()))
+                result = self.db.add_song(
                     file_path=meta["file_path"],
                     title=meta["title"] or Path(fp).stem,
                     artist=meta["artist"],
@@ -737,14 +756,23 @@ class JyMusic:
                     sample_rate=meta["sample_rate"],
                     channels=meta["channels"],
                 )
+                if result:
+                    added += 1
                 self.root.after(0, lambda i=i, t=total, f=fp:
                                 (prog.configure(value=i + 1),
                                  status_label.config(
                                      text=f"扫描中... [{i+1}/{t}] "
                                           f"{Path(f).name[:30]}")))
-            self.root.after(0, lambda: (dlg.destroy(),
-                                         self._refresh_library(),
-                                         self._refresh_playlists()))
+
+            count = added
+            self.root.after(0, lambda: (
+                dlg.destroy(),
+                self._refresh_library(),
+                self._refresh_playlists(),
+                messagebox.showinfo("扫描完成",
+                                    f"新增 {count} 首歌曲"
+                                    + ("（已取消）" if cancelled.is_set()
+                                       else ""))))
 
         threading.Thread(target=_scan, daemon=True).start()
 

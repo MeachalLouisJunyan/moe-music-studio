@@ -45,17 +45,26 @@ def _bundle_dirs():
     return dirs
 
 
+_ffmpeg_cache = None
+
+
 def find_ffmpeg():
+    global _ffmpeg_cache
+    if _ffmpeg_cache is not None:
+        return _ffmpeg_cache or None
+
     exe_name = "ffmpeg.exe" if os.name == "nt" else "ffmpeg"
     for d in _bundle_dirs():
         p = d / exe_name
         if p.is_file():
-            return str(p)
+            _ffmpeg_cache = str(p)
+            return _ffmpeg_cache
     try:
         subprocess.run(["ffmpeg", "-version"], capture_output=True, check=True,
-                       **SUBPROCESS_FLAGS)
-        return "ffmpeg"
-    except (FileNotFoundError, subprocess.CalledProcessError):
+                       timeout=5, **SUBPROCESS_FLAGS)
+        _ffmpeg_cache = "ffmpeg"
+        return _ffmpeg_cache
+    except (FileNotFoundError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
         pass
     candidates = [
         r"C:\ffmpeg\bin\ffmpeg.exe",
@@ -65,7 +74,9 @@ def find_ffmpeg():
     ]
     for p in candidates:
         if Path(p).is_file():
-            return p
+            _ffmpeg_cache = p
+            return _ffmpeg_cache
+    _ffmpeg_cache = ""
     return None
 
 
@@ -118,52 +129,43 @@ def _parse_ffprobe_output(raw):
     return result
 
 
+_ffprobe_cache = None
+
+
+def _find_ffprobe():
+    global _ffprobe_cache
+    if _ffprobe_cache is not None:
+        return _ffprobe_cache or None
+
+    ffmpeg_path = find_ffmpeg()
+    if not ffmpeg_path:
+        _ffprobe_cache = ""
+        return None
+    if ffmpeg_path == "ffmpeg":
+        _ffprobe_cache = "ffprobe"
+    else:
+        p = Path(ffmpeg_path)
+        sibling = p.with_name(p.name.replace("ffmpeg", "ffprobe"))
+        _ffprobe_cache = str(sibling) if sibling.is_file() else "ffprobe"
+    return _ffprobe_cache
+
+
 def probe_file(file_path):
     """Extract metadata from an audio file using ffprobe."""
-    ffprobe = None
-    ffmpeg_path = find_ffmpeg()
-    if ffmpeg_path:
-        if ffmpeg_path == "ffmpeg":
-            ffprobe = "ffprobe"
-        else:
-            p = Path(ffmpeg_path)
-            sibling = p.with_name(p.name.replace("ffmpeg", "ffprobe"))
-            ffprobe = str(sibling) if sibling.is_file() else "ffprobe"
-
+    ffprobe = _find_ffprobe()
     if not ffprobe:
         return _parse_ffprobe_output("")
 
     try:
         result = subprocess.run(
             [ffprobe, "-v", "quiet", "-show_entries",
-             "format=format_name,duration,bit_rate:format_tags=title,artist,"
-             "album,genre,date",
+             "format=format_name,duration,bit_rate:"
+             "stream=sample_rate,channels:"
+             "format_tags=title,artist,album,genre,date",
              "-of", "default=noprint_wrappers=1",
              str(file_path)],
-            capture_output=True, text=True, timeout=30, **SUBPROCESS_FLAGS)
-        meta = _parse_ffprobe_output(result.stdout)
-
-        # Get stream info for channels/sample_rate
-        r2 = subprocess.run(
-            [ffprobe, "-v", "quiet", "-select_streams", "a:0",
-             "-show_entries", "stream=sample_rate,channels",
-             "-of", "default=noprint_wrappers=1",
-             str(file_path)],
-            capture_output=True, text=True, timeout=30, **SUBPROCESS_FLAGS)
-        for line in r2.stdout.splitlines():
-            line = line.strip()
-            if line.startswith("sample_rate="):
-                try:
-                    meta["sample_rate"] = int(line.split("=", 1)[1])
-                except ValueError:
-                    pass
-            elif line.startswith("channels="):
-                try:
-                    meta["channels"] = int(line.split("=", 1)[1])
-                except ValueError:
-                    pass
-
-        return meta
+            capture_output=True, text=True, timeout=10, **SUBPROCESS_FLAGS)
+        return _parse_ffprobe_output(result.stdout)
     except Exception:
         return _parse_ffprobe_output("")
 
