@@ -1,5 +1,5 @@
-# 打赏渠道 — 把下面的占位换成你自己的账号，GitHub 仓库页就会出现 Sponsor 按钮。
-# 同时记得把 version.py 里的 DONATE_URL 也填上，应用内「支持作者」按钮才会指向它。
+# 打赏渠道 — GitHub 仓库页就会出现 Sponsor 按钮，应用内「支持作者」按钮指向爱发电。
 
-# github: [你的GitHub用户名]          # GitHub Sponsors
-# custom: ["https://afdian.com/a/你的ID"]   # 爱发电 / 买杯咖啡等任意链接
+github: MeachalLouisJunyan          # GitHub Sponsors
+custom:
+  - https://ifdian.net/a/LOUISMEACHALJUNYAN   # 爱发电
