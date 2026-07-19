@@ -1,0 +1,124 @@
+name: Build Release
+
+# 推 tag（如 v1.0.0）自动打包 Windows zip + macOS dmg 并挂到 GitHub Release。
+# 也可在 Actions 页面手动触发（workflow_dispatch）验证打包，产物在 artifacts 里。
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: pip install -r requirements.txt pyinstaller pillow
+
+      - name: Generate icons
+        run: python packaging/make_icons.py
+
+      - name: Build with PyInstaller
+        run: pyinstaller packaging/moe-music.spec --noconfirm
+
+      - name: Bundle static ffmpeg
+        shell: pwsh
+        run: |
+          choco install ffmpeg -y --no-progress
+          $bin = Get-ChildItem "C:\ProgramData\chocolatey\lib\ffmpeg" -Recurse -Filter ffmpeg.exe |
+            Where-Object { $_.Directory.Name -eq "bin" } | Select-Object -First 1
+          if (-not $bin) { throw "ffmpeg.exe not found under chocolatey lib" }
+          Copy-Item $bin.FullName dist\JyMusic\
+          Copy-Item (Join-Path $bin.Directory.FullName "ffprobe.exe") dist\JyMusic\
+          dist\JyMusic\ffmpeg.exe -version
+
+      - name: Zip + checksum
+        shell: pwsh
+        run: |
+          $zip = "JyMusic-${{ github.ref_name }}-windows.zip"
+          Compress-Archive -Path dist\JyMusic -DestinationPath $zip
+          (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower() + "  " + $zip |
+            Out-File -Encoding ascii "$zip.sha256"
+          Get-Content "$zip.sha256"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-zip
+          path: |
+            JyMusic-*-windows.zip
+            JyMusic-*-windows.zip.sha256
+
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            JyMusic-*-windows.zip
+            JyMusic-*-windows.zip.sha256
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: pip install -r requirements.txt pyinstaller pillow
+
+      - name: Generate icons (.png → .icns)
+        run: |
+          python packaging/make_icons.py
+          mkdir icon.iconset
+          for s in 16 32 64 128 256 512; do
+            sips -z $s $s packaging/assets/icon.png --out "icon.iconset/icon_${s}x${s}.png" >/dev/null
+            sips -z $((s*2)) $((s*2)) packaging/assets/icon.png --out "icon.iconset/icon_${s}x${s}@2x.png" >/dev/null
+          done
+          iconutil -c icns icon.iconset -o packaging/assets/icon.icns
+
+      - name: Build with PyInstaller
+        run: pyinstaller packaging/moe-music.spec --noconfirm
+
+      - name: Bundle static ffmpeg (arm64)
+        run: |
+          curl -fsSL -o ffmpeg.zip  "https://ffmpeg.martin-riedl.de/redirect/latest/macos/arm64/release/ffmpeg.zip"
+          curl -fsSL -o ffprobe.zip "https://ffmpeg.martin-riedl.de/redirect/latest/macos/arm64/release/ffprobe.zip"
+          unzip -o ffmpeg.zip -d fftmp
+          unzip -o ffprobe.zip -d fftmp
+          chmod +x fftmp/ffmpeg fftmp/ffprobe
+          cp fftmp/ffmpeg fftmp/ffprobe "dist/Jy Music.app/Contents/MacOS/"
+          "dist/Jy Music.app/Contents/MacOS/ffmpeg" -version
+
+      - name: Make DMG + checksum
+        run: |
+          mkdir dmg-stage
+          cp -R "dist/Jy Music.app" dmg-stage/
+          ln -s /Applications dmg-stage/Applications
+          dmg="JyMusic-${{ github.ref_name }}-macos.dmg"
+          hdiutil create -volname "Jy Music" -srcfolder dmg-stage -ov -format UDZO "$dmg"
+          shasum -a 256 "$dmg" > "$dmg.sha256"
+          cat "$dmg.sha256"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-dmg
+          path: |
+            JyMusic-*-macos.dmg
+            JyMusic-*-macos.dmg.sha256
+
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            JyMusic-*-macos.dmg
+            JyMusic-*-macos.dmg.sha256

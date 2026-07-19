@@ -26,12 +26,20 @@ class _AudioPlayer:
 
     def _init_pygame(self):
         import pygame
-        try:
-            pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=4096)
-        except Exception:
-            pygame.mixer.init()
-        pygame.mixer.music.set_endevent(pygame.USEREVENT + 1)
         self._pygame = pygame
+        self._mixer_ok = False
+        try:
+            try:
+                pygame.mixer.init(frequency=44100, size=-16, channels=2,
+                                  buffer=4096)
+            except Exception:
+                pygame.mixer.init()
+            self._mixer_ok = True
+        except Exception:
+            # No usable audio device — keep the app usable (library,
+            # tags, converter); playback just stays off.
+            return
+        pygame.mixer.music.set_endevent(pygame.USEREVENT + 1)
         self._end_event = pygame.USEREVENT + 1
         threading.Thread(target=self._event_loop, daemon=True).start()
 
@@ -49,6 +57,8 @@ class _AudioPlayer:
             time.sleep(0.2)
 
     def play(self, file_path, song_id=None, on_end=None):
+        if not self._mixer_ok:
+            return False
         self._callback = on_end
         try:
             self._pygame.mixer.music.load(file_path)
@@ -78,14 +88,16 @@ class _AudioPlayer:
                 self.pause()
 
     def stop(self):
-        self._pygame.mixer.music.stop()
+        if self._mixer_ok:
+            self._pygame.mixer.music.stop()
         self._playing = False
         self._paused = False
         self._current = None
 
     def set_volume(self, vol):
         self._volume = max(0.0, min(1.0, vol))
-        self._pygame.mixer.music.set_volume(self._volume)
+        if self._mixer_ok:
+            self._pygame.mixer.music.set_volume(self._volume)
 
     @property
     def volume(self):
