@@ -861,7 +861,10 @@ class JyMusic:
         tk.Label(dlg, text=f"版本 {__version__}", bg=T["card"], fg=T["dim"],
                  font=F).pack()
         tk.Label(dlg, text="本地音乐管理 · 播放 · 格式转换",
-                 bg=T["card"], fg=T["text"], font=F).pack(pady=(8, 14))
+                 bg=T["card"], fg=T["text"], font=F).pack(pady=(8, 2))
+        tk.Label(dlg, text="免费开源 · 完全离线 · 无广告 · 零数据收集",
+                 bg=T["card"], fg=T["dim"],
+                 font=("Microsoft YaHei UI", 9)).pack(pady=(0, 12))
 
         btns = tk.Frame(dlg, bg=T["card"])
         btns.pack()
