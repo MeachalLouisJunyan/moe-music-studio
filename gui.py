@@ -125,7 +125,7 @@ class JyMusic:
 
         self.db = MusicDB(str(user_data_dir() / "music.db"))
         self.player = get_player()
-        self.theme = THEMES.get(load_settings().get("theme"), THEMES["anime"])
+        self.theme = THEMES.get(load_settings().get("theme", "anime"), THEMES["anime"])
         self.current_playlist = None  # playlist id for queue
         self.play_queue = []          # list of song ids in order
         self.queue_index = -1
@@ -385,10 +385,10 @@ class JyMusic:
             songs = self.db.get_all_songs()
 
         for s in songs:
-            dur = s[6]  # duration
+            dur = s[7]  # duration (index 7 in schema)
             dur_str = f"{int(dur//60):02d}:{int(dur%60):02d}" if dur else "--:--"
             self.tree.insert("", "end", iid=str(s[0]),
-                             values=(s[2], s[3], s[4], dur_str, s[7]))
+                             values=(s[2], s[3], s[4], dur_str, s[8]))
 
         count = len(songs) if songs else self.db.count_songs()
         self.count_label.config(text=f"共 {count} 首歌曲")
@@ -483,7 +483,7 @@ class JyMusic:
                 sid = song[0]
                 s = self.db.get_song(sid)
                 if s:
-                    dur = s[6]
+                    dur = s[7]
                     if dur:
                         self.player.seek(float(val) / 1000 * dur)
         except Exception:
@@ -509,7 +509,7 @@ class JyMusic:
             if song:
                 s = self.db.get_song(song[0])
                 if s:
-                    dur = s[6]
+                    dur = s[7]
             if dur > 0 and pos < dur:
                 self.time_label.config(
                     text=f"{int(pos//60):02d}:{int(pos%60):02d} / "

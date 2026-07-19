@@ -8,7 +8,7 @@ from pathlib import Path
 
 SUPPORTED_EXTS = {
     ".flac", ".wav", ".wave", ".aiff", ".aif", ".aifc",
-    ".alac", ".ape", ".wv", ".tta", ".m4a",
+    ".alac", ".ape", ".wv", ".tta",
     ".dsf", ".dff",
     ".mp3", ".mp2", ".mp1",
     ".aac", ".m4a", ".m4b", ".m4p", ".m4r", ".3gp", ".3g2",
