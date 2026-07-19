@@ -5,9 +5,11 @@ Music library manager + player + converter — all in one.
 """
 
 import os
+import subprocess
 import sys
 import threading
 import tkinter as tk
+import webbrowser
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
@@ -15,7 +17,31 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from database import MusicDB
 from player import get_player
-from scanner import probe_file, quick_scan, SUPPORTED_EXTS
+from scanner import (SUBPROCESS_FLAGS, SUPPORTED_EXTS, find_ffmpeg,
+                     probe_file, quick_scan)
+from version import APP_NAME, DONATE_URL, REPO_URL, __version__
+
+
+def user_data_dir():
+    """Writable per-user data directory.
+
+    When frozen (PyInstaller), the install dir may be read-only
+    (Program Files / .app bundle), so the database must live in the
+    platform's user-data location. In dev mode keep it next to the
+    source as before.
+    """
+    if not getattr(sys, "frozen", False):
+        return Path(__file__).parent
+    if sys.platform == "win32":
+        base = Path(os.environ.get("APPDATA", str(Path.home())))
+    elif sys.platform == "darwin":
+        base = Path.home() / "Library" / "Application Support"
+    else:
+        base = Path(os.environ.get(
+            "XDG_DATA_HOME", str(Path.home() / ".local" / "share")))
+    d = base / "JyMusic"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
 
 # ═══════════════════════════════════════════════════════════════
 # Themes
@@ -74,11 +100,11 @@ THEMES = {
 class JyMusic:
     def __init__(self, root):
         self.root = root
-        self.root.title("Jy Music")
+        self.root.title(f"{APP_NAME} v{__version__}")
         self.root.geometry("1024x640")
         self.root.minsize(800, 500)
 
-        self.db = MusicDB(str(Path(__file__).parent / "music.db"))
+        self.db = MusicDB(str(user_data_dir() / "music.db"))
         self.player = get_player()
         self.theme = THEMES["anime"]
         self.current_playlist = None  # playlist id for queue
@@ -138,6 +164,17 @@ class JyMusic:
         play_menu.add_command(label="新建播放列表",
                               command=self._new_playlist_dialog)
         menubar.add_cascade(label="播放列表", menu=play_menu)
+
+        help_menu = tk.Menu(menubar, tearoff=0, bg=T["card"], fg=T["text"],
+                            activebackground=T["accent"])
+        help_menu.add_command(label="☕ 支持作者",
+                              command=lambda: webbrowser.open(
+                                  DONATE_URL or REPO_URL))
+        help_menu.add_command(label="GitHub 主页",
+                              command=lambda: webbrowser.open(REPO_URL))
+        help_menu.add_separator()
+        help_menu.add_command(label="关于", command=self._about_dialog)
+        menubar.add_cascade(label="帮助", menu=help_menu)
         self.root.config(menu=menubar)
 
         # ── Main layout ──
@@ -693,21 +730,149 @@ class JyMusic:
         threading.Thread(target=_scan, daemon=True).start()
 
     # ═══════════════════════════════════════════════════════════
-    # Converter (opens converter tool)
+    # Converter (built-in, powered by ffmpeg)
     # ═══════════════════════════════════════════════════════════
 
+    # target format → extra ffmpeg encode args
+    CONVERT_FORMATS = {
+        "mp3":  ["-codec:a", "libmp3lame", "-q:a", "2"],
+        "flac": ["-codec:a", "flac"],
+        "wav":  [],
+        "ogg":  ["-codec:a", "libvorbis", "-q:a", "5"],
+        "opus": ["-codec:a", "libopus", "-b:a", "128k"],
+        "m4a":  ["-codec:a", "aac", "-b:a", "192k"],
+    }
+
     def _open_converter(self):
-        converter_path = (Path(__file__).parent.parent /
-                          "audio-converter" / "audio_convert_gui_anime.py")
-        if converter_path.is_file():
-            threading.Thread(
-                target=lambda: os.system(
-                    f'start python "{converter_path}"'),
-                daemon=True).start()
-        else:
-            messagebox.showinfo("提示",
-                                "未找到转换器\n"
-                                "请确保 audio-converter 在同级目录")
+        ffmpeg = find_ffmpeg()
+        if not ffmpeg:
+            messagebox.showerror(
+                "格式转换",
+                "未找到 ffmpeg，无法转换。\n"
+                "请安装 ffmpeg 并加入系统 PATH，或使用官网打包版（已内置）。")
+            return
+
+        T = self.theme
+        F = ("Microsoft YaHei UI", 10)
+
+        dlg = tk.Toplevel(self.root)
+        dlg.title("格式转换")
+        dlg.geometry("420x300")
+        dlg.configure(bg=T["card"])
+        dlg.transient(self.root)
+
+        files = []
+        file_label = tk.Label(dlg, text="未选择文件", bg=T["card"],
+                              fg=T["dim"], font=F)
+
+        def _pick_files():
+            exts = " ".join(f"*{e}" for e in sorted(SUPPORTED_EXTS))
+            picked = filedialog.askopenfilenames(
+                title="选择要转换的音频文件", parent=dlg,
+                filetypes=[("音频文件", exts), ("所有文件", "*.*")])
+            if picked:
+                files.clear()
+                files.extend(picked)
+                file_label.config(text=f"已选择 {len(files)} 个文件",
+                                  fg=T["text"])
+
+        tk.Button(dlg, text="选择文件...", bg=T["accent"], fg="white",
+                  font=F, padx=16, pady=4, borderwidth=0, cursor="hand2",
+                  command=_pick_files).pack(pady=(18, 4))
+        file_label.pack()
+
+        row = tk.Frame(dlg, bg=T["card"])
+        row.pack(pady=10)
+        tk.Label(row, text="目标格式:", bg=T["card"], fg=T["text"],
+                 font=F).pack(side="left", padx=(0, 8))
+        fmt_var = tk.StringVar(value="mp3")
+        ttk.Combobox(row, textvariable=fmt_var, state="readonly", width=8,
+                     values=list(self.CONVERT_FORMATS)).pack(side="left")
+
+        prog = ttk.Progressbar(dlg, mode="determinate", length=340)
+        prog.pack(pady=(6, 2))
+        status = tk.Label(dlg, text="", bg=T["card"], fg=T["dim"], font=F)
+        status.pack()
+
+        def _convert():
+            if not files:
+                messagebox.showinfo("格式转换", "请先选择文件", parent=dlg)
+                return
+            out_dir = filedialog.askdirectory(title="选择输出文件夹",
+                                              parent=dlg)
+            if not out_dir:
+                return
+            fmt = fmt_var.get()
+            btn_go.config(state="disabled")
+            prog.config(maximum=len(files), value=0)
+
+            def _work():
+                done, failed = 0, 0
+                for i, src in enumerate(files):
+                    dst = str(Path(out_dir) /
+                              (Path(src).stem + "." + fmt))
+                    self.root.after(0, lambda n=Path(src).name: status.config(
+                        text=f"转换中... {n[:36]}"))
+                    try:
+                        r = subprocess.run(
+                            [ffmpeg, "-y", "-i", src, "-vn",
+                             *self.CONVERT_FORMATS[fmt], dst],
+                            capture_output=True, timeout=600,
+                            **SUBPROCESS_FLAGS)
+                        if r.returncode == 0:
+                            done += 1
+                        else:
+                            failed += 1
+                    except Exception:
+                        failed += 1
+                    self.root.after(0, lambda v=i + 1: prog.config(value=v))
+
+                def _finish():
+                    btn_go.config(state="normal")
+                    status.config(text=f"完成：成功 {done}，失败 {failed}")
+                    messagebox.showinfo(
+                        "格式转换", f"转换完成！\n成功 {done} 个，失败 {failed} 个",
+                        parent=dlg)
+                self.root.after(0, _finish)
+
+            threading.Thread(target=_work, daemon=True).start()
+
+        btn_go = tk.Button(dlg, text="开始转换", bg=T["accent"], fg="white",
+                           font=F, padx=24, pady=6, borderwidth=0,
+                           cursor="hand2", command=_convert)
+        btn_go.pack(pady=10)
+
+    # ═══════════════════════════════════════════════════════════
+    # About
+    # ═══════════════════════════════════════════════════════════
+
+    def _about_dialog(self):
+        T = self.theme
+        F = ("Microsoft YaHei UI", 10)
+
+        dlg = tk.Toplevel(self.root)
+        dlg.title("关于")
+        dlg.geometry("340x220")
+        dlg.configure(bg=T["card"])
+        dlg.transient(self.root)
+
+        tk.Label(dlg, text=f"♫ {APP_NAME}", bg=T["card"], fg=T["accent"],
+                 font=("Microsoft YaHei UI", 14, "bold")).pack(pady=(22, 2))
+        tk.Label(dlg, text=f"版本 {__version__}", bg=T["card"], fg=T["dim"],
+                 font=F).pack()
+        tk.Label(dlg, text="本地音乐管理 · 播放 · 格式转换",
+                 bg=T["card"], fg=T["text"], font=F).pack(pady=(8, 14))
+
+        btns = tk.Frame(dlg, bg=T["card"])
+        btns.pack()
+        tk.Button(btns, text="☕ 支持作者", bg=T["accent"], fg="white",
+                  font=F, padx=14, pady=4, borderwidth=0, cursor="hand2",
+                  command=lambda: webbrowser.open(DONATE_URL or REPO_URL)
+                  ).pack(side="left", padx=6)
+        tk.Button(btns, text="GitHub", bg=T["accent2"], fg="white",
+                  font=F, padx=14, pady=4, borderwidth=0, cursor="hand2",
+                  command=lambda: webbrowser.open(REPO_URL)
+                  ).pack(side="left", padx=6)
 
     # ═══════════════════════════════════════════════════════════
     # Theme

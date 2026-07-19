@@ -6,6 +6,21 @@
 
 ---
 
+## 📥 下载（普通用户看这里！）
+
+**不用装 Python、不用配 ffmpeg**，下载解压双击就能用：
+
+👉 **[前往 Releases 页面下载最新版](https://github.com/MeachalLouisJunyan/moe-music-studio/releases/latest)**
+
+| 平台 | 文件 | 说明 |
+|------|------|------|
+| 🪟 Windows | `JyMusic-vX.X.X-windows.zip` | 解压后双击 `JyMusic.exe`。SmartScreen 若提示「未知发布者」，点「更多信息 → 仍要运行」 |
+| 🍎 macOS (Apple Silicon) | `JyMusic-vX.X.X-macos.dmg` | 拖进「应用程序」。首次打开请**右键 → 打开**（应用未签名） |
+
+> 转换功能所需的 ffmpeg 已经打包在里面啦，零配置开箱即用 ✨
+
+---
+
 ## 🌸 这是什么？
 
 **萌音工作室**是一只萌萌哒本地音乐管理播放器 desu~  
@@ -66,7 +81,7 @@ python main.py
 🎨 UI 界面  ——  Tkinter
 🗄️ 数据库  ——  SQLite
 🎵 播放引擎 ——  pygame
-🔄 格式转换 ——  audio-converter + ffmpeg
+🔄 格式转换 ——  内置转换器 + ffmpeg
 🖱️ 拖拽支持 ——  tkinterdnd2
 ```
 
@@ -82,6 +97,16 @@ python main.py
 
 发现了 Bug？有好的想法？欢迎提 **Issue** 或 **Pull Request** 哦！  
 在动手之前，记得先看看项目规范 (◕‿◕✿)
+
+---
+
+## ☕ 支持作者
+
+本软件**完全免费**。如果她帮到了你，可以请作者喝杯奶茶，
+这是让开发继续下去的最大动力！(๑´ㅂ`๑)
+
+- ⭐ 给仓库点个 Star
+- ☕ 应用内「帮助 → 支持作者」，或通过仓库页的 Sponsor 按钮打赏
 
 ---
 

@@ -1,3 +1,11 @@
 __pycache__/
 *.db
+*.db-shm
+*.db-wal
 converted/
+
+# PyInstaller
+build/
+dist/
+packaging/assets/icon.icns
+*.iconset/

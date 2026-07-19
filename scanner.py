@@ -3,6 +3,7 @@
 
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 SUPPORTED_EXTS = {
@@ -25,9 +26,34 @@ SUPPORTED_EXTS = {
 }
 
 
+# Keep ffmpeg/ffprobe from flashing console windows when running
+# as a windowed (no-console) frozen app on Windows.
+SUBPROCESS_FLAGS = (
+    {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}
+)
+
+
+def _bundle_dirs():
+    """Directories where a bundled ffmpeg may live when frozen by PyInstaller."""
+    dirs = []
+    if getattr(sys, "frozen", False):
+        exe_dir = Path(sys.executable).parent
+        dirs += [exe_dir, exe_dir / "_internal"]
+        meipass = getattr(sys, "_MEIPASS", None)
+        if meipass:
+            dirs.append(Path(meipass))
+    return dirs
+
+
 def find_ffmpeg():
+    exe_name = "ffmpeg.exe" if os.name == "nt" else "ffmpeg"
+    for d in _bundle_dirs():
+        p = d / exe_name
+        if p.is_file():
+            return str(p)
     try:
-        subprocess.run(["ffmpeg", "-version"], capture_output=True, check=True)
+        subprocess.run(["ffmpeg", "-version"], capture_output=True, check=True,
+                       **SUBPROCESS_FLAGS)
         return "ffmpeg"
     except (FileNotFoundError, subprocess.CalledProcessError):
         pass
@@ -97,9 +123,12 @@ def probe_file(file_path):
     ffprobe = None
     ffmpeg_path = find_ffmpeg()
     if ffmpeg_path:
-        ffprobe = ffmpeg_path.replace("ffmpeg", "ffprobe")
-        if not Path(ffprobe).is_file():
+        if ffmpeg_path == "ffmpeg":
             ffprobe = "ffprobe"
+        else:
+            p = Path(ffmpeg_path)
+            sibling = p.with_name(p.name.replace("ffmpeg", "ffprobe"))
+            ffprobe = str(sibling) if sibling.is_file() else "ffprobe"
 
     if not ffprobe:
         return _parse_ffprobe_output("")
@@ -111,7 +140,7 @@ def probe_file(file_path):
              "album,genre,date",
              "-of", "default=noprint_wrappers=1",
              str(file_path)],
-            capture_output=True, text=True, timeout=30)
+            capture_output=True, text=True, timeout=30, **SUBPROCESS_FLAGS)
         meta = _parse_ffprobe_output(result.stdout)
 
         # Get stream info for channels/sample_rate
@@ -120,7 +149,7 @@ def probe_file(file_path):
              "-show_entries", "stream=sample_rate,channels",
              "-of", "default=noprint_wrappers=1",
              str(file_path)],
-            capture_output=True, text=True, timeout=30)
+            capture_output=True, text=True, timeout=30, **SUBPROCESS_FLAGS)
         for line in r2.stdout.splitlines():
             line = line.strip()
             if line.startswith("sample_rate="):
